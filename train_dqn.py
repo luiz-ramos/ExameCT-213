@@ -8,7 +8,7 @@ import utils
 import tensorflow as tf
 
 
-NUM_EPISODES = 300  # Number of episodes used for training
+NUM_EPISODES = 3000  # Number of episodes used for training
 RENDER = False  # If the Mountain Car environment should be rendered
 fig_format = 'png'  # Format used for saving matplotlib's figures
 # fig_format = 'eps'
@@ -21,7 +21,7 @@ tf.compat.v1.disable_eager_execution()
 
 # Initiating the Super Mario Bros environment
 env = retro.make('SuperMarioBros-Nes', state='Level1-1.state', render_mode='human')
-state_size = env.observation_space.shape[0]
+state_size = 15*16
 action_size = env.action_space.n
 
 # Creating the DQN agent
@@ -30,38 +30,43 @@ agent = DQNAgent(state_size, action_size)
 # Checking if weights from previous learning session exists
 if os.path.exists('super_mario.h5'):
     print('Loading weights from previous learning session.')
-    agent.load("mountain_car.h5")
+    agent.load("super_mario.h5")
 else:
     print('No weights found from previous learning session.')
 done = False
-batch_size = 32  # batch size used for the experience replay
+batch_size = 64  # batch size used for the experience replay
 return_history = []
 
 for episodes in range(1, NUM_EPISODES + 1):
     # Reset the environment
-    state, _ = env.reset()
+    env.reset()
+    ram = env.get_ram()
     # This reshape is needed to keep compatibility with Keras
+    tiles = utils.SMB.get_tiles(ram)
+    state = utils.SMB.get_tiles_array(tiles)
     state = np.reshape(state, [1, state_size])
     # Cumulative reward is the return since the beginning of the episode
     cumulative_reward = 0.0
-    for time in range(1, 500):
+    while not done:
         if RENDER:
             env.render()  # Render the environment for visualization
         # Select action
         action = agent.act(state)
         # Take action, observe reward and new state
-        next_state, reward, terminated, truncated, _ = env.step(action)
-        done = terminated or truncated
+        ob, reward, done, fa, info = env.step(action)
+        time = info['time']
         # Reshaping to keep compatibility with Keras
-        next_state = np.reshape(next_state, [1, state_size])
+        next_tiles = utils.SMB.get_tiles(ram)
+        next_state = utils.SMB.get_tiles_array(next_tiles)
+        next_state = np.reshape(state, [1, state_size])
         # Making reward engineering to allow faster training
-        reward = utils.reward_engineering_mountain_car(state[0], action, reward, next_state[0], done)
+        reward = utils.reward_engineering_mario(state[0], action, reward, next_state[0], done, info)
         # Appending this experience to the experience replay buffer
         agent.append_experience(state, action, reward, next_state, done)
         state = next_state
         # Accumulate reward
         cumulative_reward = agent.gamma * cumulative_reward + reward
-        if done:
+        if info['lives'] < 2:
             print("episode: {}/{}, time: {}, score: {:.6}, epsilon: {:.3}"
                   .format(episodes, NUM_EPISODES, time, cumulative_reward, agent.epsilon))
             break

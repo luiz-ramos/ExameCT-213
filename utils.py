@@ -324,13 +324,10 @@ class SMB(object):
         for loc in tiles:
             tiles_arr[loc[0]][loc[1]] = tiles[loc].value
         
-        return tiles_arr
+        return tiles_arr.flatten()
 
 
-START_POSITION_CAR = -0.5
-
-
-def reward_engineering_mountain_car(state, action, reward, next_state, done):
+def reward_engineering_mario(state, action, reward, next_state, done, info):
     """
     Makes reward engineering to allow faster training in the Mountain Car environment.
 
@@ -347,10 +344,6 @@ def reward_engineering_mountain_car(state, action, reward, next_state, done):
     :return: modified reward for faster training.
     :rtype: float.
     """
-    # Todo: implement reward engineering
-    position = state[0]
-    velocity = state[1]
-    reward += (position - START_POSITION_CAR) ** 2 + velocity ** 2
-    if next_state[0] >= 0.5:
-        reward += 50
+    
+    reward += info['levelHi']**2
     return reward
