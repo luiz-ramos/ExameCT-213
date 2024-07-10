@@ -70,10 +70,13 @@ class DQNAgent:
         greedy_action = np.argmax(q)
         p = np.random.rand()
         p_greedy = 1 - self.epsilon
+        action = np.zeros(self.action_size)
         if p <= p_greedy:
-            return greedy_action
+            action[greedy_action] = 1
         else:
-            return np.random.randint(self.action_size)
+            action[np.random.randint(self.action_size)] = 1
+        
+        return action
 
     def append_experience(self, state, action, reward, next_state, done):
         """
@@ -106,9 +109,9 @@ class DQNAgent:
         for state, action, reward, next_state, done in minibatch:
             target = self.model.predict(state)
             if not done:
-                target[0][action] = reward + self.gamma * np.max(self.model.predict(next_state)[0])
+                target[0][np.argmax(action)] = reward + self.gamma * np.max(self.model.predict(next_state)[0])
             else:
-                target[0][action] = reward
+                target[0][np.argmax(action)] = reward
             # Filtering out states and targets for training
             states.append(state[0])
             targets.append(target[0])
