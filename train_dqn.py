@@ -1,6 +1,6 @@
 import os
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
-import retro
+import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from dqn_agent import DQNAgent
@@ -20,17 +20,17 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 tf.compat.v1.disable_eager_execution()
 
 # Initiating the Super Mario Bros environment
-env = retro.make('SuperMarioBros-Nes', state='Level1-1.state', render_mode='human')
-state_size = 15*16
+env = gym.make("CarRacing-v2", render_mode='human')
+state_size = env.observation_space.shape[0]
 action_size = env.action_space.n
 
 # Creating the DQN agent
 agent = DQNAgent(state_size, action_size)
 
 # Checking if weights from previous learning session exists
-if os.path.exists('super_mario.h5'):
+if os.path.exists('car_racing.h5'):
     print('Loading weights from previous learning session.')
-    agent.load("super_mario.h5")
+    agent.load("car_racing.h5")
 else:
     print('No weights found from previous learning session.')
 done = False
@@ -40,10 +40,8 @@ return_history = []
 for episodes in range(1, NUM_EPISODES + 1):
     # Reset the environment
     env.reset()
-    ram = env.get_ram()
     # This reshape is needed to keep compatibility with Keras
-    tiles = utils.SMB.get_tiles(ram)
-    state = utils.SMB.get_tiles_array(tiles)
+    state = None
     state = np.reshape(state, [1, state_size])
     # Cumulative reward is the return since the beginning of the episode
     cumulative_reward = 0.0
@@ -56,17 +54,16 @@ for episodes in range(1, NUM_EPISODES + 1):
         ob, reward, done, fa, info = env.step(action)
         time = info['time']
         # Reshaping to keep compatibility with Keras
-        next_tiles = utils.SMB.get_tiles(ram)
-        next_state = utils.SMB.get_tiles_array(next_tiles)
-        next_state = np.reshape(state, [1, state_size])
+        next_state = None
+        next_state = np.reshape(next_state, [1, state_size])
         # Making reward engineering to allow faster training
-        reward = utils.reward_engineering_mario(state[0], action, reward, next_state[0], done, info)
+        reward = utils.reward_engineering(state[0], action, reward, next_state[0], done)
         # Appending this experience to the experience replay buffer
         agent.append_experience(state, action, reward, next_state, done)
         state = next_state
         # Accumulate reward
         cumulative_reward = agent.gamma * cumulative_reward + reward
-        if info['lives'] < 2:
+        if done:
             print("episode: {}/{}, time: {}, score: {:.6}, epsilon: {:.3}"
                   .format(episodes, NUM_EPISODES, time, cumulative_reward, agent.epsilon))
             break
