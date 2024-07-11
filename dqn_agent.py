@@ -61,7 +61,7 @@ class DQNAgent:
         Chooses an action using an epsilon-greedy policy.
 
         :param state: current state.
-        :type state: NumPy array with dimension (1, 2).
+        :type state: NumPy array with dimension (96, 96, 3).
         :return: chosen action.
         :rtype: int.
         """
@@ -83,13 +83,13 @@ class DQNAgent:
         Appends a new experience to the replay buffer (and forget an old one if the buffer is full).
 
         :param state: state.
-        :type state: NumPy array with dimension (1, 2).
+        :type state: NumPy array with dimension (96, 96, 3).
         :param action: action.
         :type action: int.
         :param reward: reward.
         :type reward: float.
         :param next_state: next state.
-        :type next_state: NumPy array with dimension (1, 2).
+        :type next_state: NumPy array with dimension (96, 96, 3).
         :param done: if the simulation is over after this experience.
         :type done: bool.
         """
