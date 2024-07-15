@@ -6,11 +6,25 @@ import tensorflow
 import random
 
 
-class DDPG(object):
-    def __init__(self, state_size, action_size, actor_hidden_units=(300, 600),
-                 actor_learning_rate=0.0001, critic_hidden_units=(300, 600),
-                 critic_learning_rate=0.001, batch_size=64, discount=0.99,
-                 memory_size=10000, tau=0.001):
+def _generate_tensorflow_session():
+    """
+    Generates and returns the tensorflow session
+    :return: the Tensorflow Session
+    """
+    config = tensorflow.ConfigProto()
+    config.gpu_options.allow_growth = True
+    return tensorflow.Session(config=config)
+
+
+class DDPGAgent(object):
+    """
+    Represents a Deep Deterministic Policy Gradient (DDPG) agent.
+    """
+
+    def __init__(self, state_size, action_size, actor_hidden_units=(20, 40),
+                 actor_learning_rate=0.0001, critic_hidden_units=(20, 40),
+                 critic_learning_rate=0.001, gamma=0.95,
+                 buffer_size=4098, learning_rate=0.001):
         """
         Constructs a DDPG Agent with the given parameters
 
@@ -27,84 +41,73 @@ class DDPG(object):
             layer.
         :param critic_learning_rate: Float denoting the learning rate of the
             Critic network. Best to be some small number close to 0.
-        :param batch_size: Int denoting the batch size for training.
-        :param discount: Float denoting the discount (gamma) given to future
-            potentioal rewards when calculating q values
-        :param memory_size: Int denoting the number of State, action, rewards
+        :param gamma: Float denoting the discount (gamma) given to future
+            potential rewards when calculating q values
+        :param buffer_size: Int denoting the number of State, action, rewards
             that the agent will remember
-        :param tau:
+        :param learning_rate:
         """
 
-        self._discount = discount
-        self._batch_size = batch_size
-        self._memory_size = memory_size
+        self._discount = gamma
+        self._memory_size = buffer_size
 
-        tensorflow_session = self._generate_tensorflow_session
+        tensorflow_session = _generate_tensorflow_session
 
         self._actor = Actor(tensorflow_session=tensorflow_session,
                             state_size=state_size, action_size=action_size,
                             hidden_units=actor_hidden_units,
                             learning_rate=actor_learning_rate,
-                            batch_size=batch_size, tau=tau)
+                            tau=learning_rate)
 
         self._critic = Critic(tensorflow_session=tensorflow_session,
                               state_size=state_size, action_size=action_size,
                               hidden_units=critic_hidden_units,
                               learning_rate=critic_learning_rate,
-                              batch_size=batch_size, tau=tau)
+                              tau=learning_rate)
 
         self._memory = deque()
 
-    def _generate_tensorflow_session(self):
-        """
-        Generates and returns the tensorflow session
-        :return: the Tensorflow Session
-        """
-        config = tensorflow.ConfigProto()
-        config.gpu_options.allow_growth = True
-        return tensorflow.Session(config=config)
-
-    def get_action(self, state):
+    def act(self, state):
         """
         Returns the best action predicted by the agent given the current state.
         :param state: numpy array denoting the current state.
         :return: numpy array denoting the predicted action.
         """
-        return self._actor._model.predict(state)
+        return self._actor.get_action(state)
 
-    def train(self):
+    def train(self, batch_size):
         """
-        Trains the DDPG Agent from it's current memory
+        Trains the DDPG Agent from its current memory
 
         Please note that the agent must have gone through more steps than the
         specified batch size before this method will do anything
 
         :return: None
         """
-        if len(self._memory) > self._batch_size:
-            self._train()
+        if len(self._memory) > batch_size:
+            self._train(batch_size)
 
-    def _train(self):
+    def _train(self, batch_size):
         """
         Helper method for train. Takes care of sampling, and training and
         updating both the actor and critic networks
 
         :return: None
         """
-        states, actions, rewards, done, next_states = self._get_sample()
+        states, actions, rewards, done, next_states = self._get_sample(batch_size)
         self._train_critic(states, actions, next_states, done, rewards)
         self._train_actor(states)
         self._update_target_models()
 
-    def _get_sample(self):
+    def _get_sample(self, batch_size):
         """
         Finds a random sample of size self._batch_size from the agent's current
         memory.
 
-        :return: Tuple(List(Float, Boolean))) denoting the sample of states,
+        :return: Tuple(List(Float, Boolean)) denoting the sample of states,
             actions, rewards, done, and next states.
         """
-        sample = random.sample(self._memory, self._batch_size)
+        sample = random.sample(self._memory, batch_size)
         states, actions, rewards, done, next_states = zip(*sample)
         return states, actions, rewards, done, next_states
 
@@ -139,11 +142,10 @@ class DDPG(object):
         :param rewards: List(Float) Denoting the reward given in each step
         :return: The q targets
         """
-        next_actions = self._actor._model.predict(next_states)
-        next_q_values = self._critic._target_model.predict(next_states,
-                                                           next_actions)
-        q_targets = [reward if this_done else reward + self._discount *
-                                                       (next_q_value)
+        next_actions = self._actor.get_target_action(next_states)
+        next_q_values = self._critic.get_target_q(next_states,
+                                                  next_actions)
+        q_targets = [reward if this_done else reward + self._discount * next_q_value
                      for (reward, next_q_value, this_done)
                      in zip(rewards, next_q_values, done)]
         return q_targets
@@ -166,10 +168,8 @@ class DDPG(object):
         :param states: The states to calculate the gradients for.
         :return:
         """
-        action_for_gradients = self._actor._model.predict(states)
-        self._critic.get_gradients(states, action_for_gradients)
-
-        # todo finish this.
+        action_for_gradients = self._actor.get_action(states)
+        return self._critic.get_gradients(states, action_for_gradients)
 
     def _update_target_models(self):
         """

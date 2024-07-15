@@ -13,7 +13,7 @@ class Actor(object):
     """
 
     def __init__(self, tensorflow_session, state_size, action_size,
-                 hidden_units, learning_rate=0.0001, batch_size=64,
+                 hidden_units, learning_rate=0.0001,
                  tau=0.001):
         """
         Constructor for the Actor network
@@ -29,7 +29,6 @@ class Actor(object):
             each layer. Soon to be depreciated. default: (300, 600)
         :param learning_rate: A fload denoting the speed at which the network
             will learn. default: 0.0001
-        :param batch_size: An integer denoting the batch size. default: 64
         :param tau: A flot denoting the rate at which the target model will
             track the main model. Formally, the tracking function is defined as:
 
@@ -49,7 +48,6 @@ class Actor(object):
         self._tensorflow_session = tensorflow_session
         self._state_size = state_size
         self._action_size = action_size
-        self._batch_size = batch_size
         self._tau = tau
         self._learning_rate = learning_rate
         self._hidden = hidden_units
@@ -78,6 +76,22 @@ class Actor(object):
 
         # And initialise all tensorflow variables
         self._tensorflow_session.run(tensorflow.initialize_all_variables())
+
+    def get_action(self, state):
+        """
+        Returns the best action predicted by the agent given the current state.
+        :param state: numpy array denoting the current state.
+        :return: numpy array denoting the predicted action.
+        """
+        return self._model.predict(state)
+
+    def get_target_action(self, state):
+        """
+        Returns the best action predicted by the target model agent given the current state.
+        :param state: numpy array denoting the current state.
+        :return: numpy array denoting the predicted action.
+        """
+        return self._target_model.predict(state)
 
     def train(self, states, action_gradients):
         """
