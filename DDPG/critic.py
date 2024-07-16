@@ -1,5 +1,6 @@
 import tensorflow
 from tensorflow.keras import models, layers, optimizers, backend, activations, losses
+import tensorflow.keras.backend as K
 import numpy as np
 
 
@@ -55,10 +56,10 @@ class Critic(object):
             self._generate_model()
 
         # Gradients for policy update
-        self._action_gradients = tensorflow.compat.v1.gradients(self._model.output,
-                                                                self._action_input)
-        print(type(self._action_gradients))
+        self._action_gradients = K.function([self._model.input[0], self._model.input[1]],
+                                           K.gradients(self._model.output, [self._model.input[1]]))
 
+        # And initialise all tensorflow variables
         tensorflow.compat.v1.global_variables_initializer()
 
     def get_gradients(self, states, actions):
@@ -68,10 +69,7 @@ class Critic(object):
         :param actions:
         :return:
         """
-        return self._tensorflow_session.run(self._action_gradients, feed_dict={
-            self._state_inputs: states,
-            self._action_input: actions
-        })[0]
+        return self._action_gradients([states, actions])
 
     def get_q(self, state, action):
         """

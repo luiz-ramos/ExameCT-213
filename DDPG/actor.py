@@ -1,5 +1,6 @@
 import tensorflow
 from tensorflow.keras import models, layers, optimizers, backend, activations, losses
+import tensorflow.keras.backend as K
 import numpy as np
 
 
@@ -64,16 +65,16 @@ class Actor(object):
             self._generate_model()
 
         # Generate tensors to hold the gradients for our Policy Gradient update
-        self._action_gradients = tensorflow.compat.v1.placeholder(shape=[None, self._action_size],
-                                                                  dtype=tensorflow.float32)
-        self._parameter_gradients = tensorflow.compat.v1.gradients(self._model.output,
-                                                                   self._model_weights,
-                                                                   -self._action_gradients)
+        self._action_gradients = K.placeholder(shape=[None, self._action_size])
+        self._parameter_gradients = tensorflow.gradients(self._model.output,
+                                                         self._model_weights,
+                                                         -self._action_gradients)
         self._gradients = zip(self._parameter_gradients, self._model_weights)
 
         # Define the optimisation function
-        self._optimize = tensorflow.optimizers.legacy.Adam(learning_rate) \
-            .apply_gradients(self._gradients)
+        self._optimize = tensorflow.optimizers.legacy.Adam(self._learning_rate).apply_gradients(self._gradients)
+        self._adam_optimizer = K.function(inputs=[self._model.input, self._action_gradients], outputs=[K.constant(1)],
+                                          updates=[self._optimize][1:])
 
         # And initialise all tensorflow variables
         tensorflow.compat.v1.global_variables_initializer()
@@ -103,10 +104,8 @@ class Actor(object):
             network
         :return: None
         """
-        self._tensorflow_session.run(self._optimize, feed_dict={
-            self._states: states,
-            self._action_gradients: action_gradients
-        })
+        action_gradients = action_gradients[0]
+        self._adam_optimizer([states, action_gradients])
 
     def train_target_model(self):
         """

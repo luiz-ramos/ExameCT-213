@@ -97,6 +97,7 @@ class DDPGAgent(object):
 
         :return: None
         """
+        print("Training DDPG Agent")
         states, actions, rewards, done, next_states = self._get_sample(batch_size)
 
         # Transforming into numpy array
