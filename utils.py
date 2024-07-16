@@ -1,3 +1,32 @@
+import cv2
+import numpy as np
+
+
+def green_mask(observation):
+    # convert to hsv
+    hsv = cv2.cvtColor(observation, cv2.COLOR_BGR2HSV)
+
+    mask_green = cv2.inRange(hsv, (36, 25, 25), (70, 255, 255))
+
+    # slice the green
+    imask_green = mask_green > 0
+    green = np.zeros_like(observation, np.uint8)
+    green[imask_green] = observation[imask_green]
+
+    return green
+
+
+def gray_scale(observation):
+    gray = cv2.cvtColor(observation, cv2.COLOR_RGB2GRAY)
+    return gray
+
+
+def preprocess_state(observation):
+    green = green_mask(observation)
+    grey = gray_scale(green)
+    state = np.reshape(grey, (grey.shape[0], grey.shape[1], 1))
+    return state
+
 
 def reward_engineering(state, action, reward, next_state, done):
     """

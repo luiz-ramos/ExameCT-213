@@ -1,5 +1,7 @@
 import tensorflow
 from tensorflow.keras import models, layers, optimizers, backend, activations, losses
+import tensorflow.keras.backend as K
+import numpy as np
 
 
 class Actor(object):
@@ -12,8 +14,8 @@ class Actor(object):
     actions a.
     """
 
-    def __init__(self, tensorflow_session, state_size, action_size,
-                 hidden_units, learning_rate=0.0001, batch_size=64,
+    def __init__(self, tensorflow_session, state_shape, action_size,
+                 hidden_units, learning_rate=0.0001,
                  tau=0.001):
         """
         Constructor for the Actor network
@@ -21,7 +23,7 @@ class Actor(object):
         :param tensorflow_session: The tensorflow session.
             See https://www.tensorflow.org for more information on tensorflow
             sessions.
-        :param state_size: An integer denoting the dimensionality of the states
+        :param state_shape: An array denoting the dimensionality of the states
             in the current problem
         :param action_size: An integer denoting the dimensionality of the
             actions in the current problem
@@ -29,7 +31,6 @@ class Actor(object):
             each layer. Soon to be depreciated. default: (300, 600)
         :param learning_rate: A fload denoting the speed at which the network
             will learn. default: 0.0001
-        :param batch_size: An integer denoting the batch size. default: 64
         :param tau: A flot denoting the rate at which the target model will
             track the main model. Formally, the tracking function is defined as:
 
@@ -47,15 +48,14 @@ class Actor(object):
         # Store parameters
         self._states = None
         self._tensorflow_session = tensorflow_session
-        self._state_size = state_size
+        self._state_shape = state_shape
         self._action_size = action_size
-        self._batch_size = batch_size
         self._tau = tau
         self._learning_rate = learning_rate
         self._hidden = hidden_units
 
         # Let tensorflow and keras work together
-        backend.set_session(tensorflow_session)
+        tensorflow.compat.v1.keras.backend.set_session(tensorflow_session)
 
         # Generate the main model
         self._model, self._model_weights, self._model_input = \
@@ -65,19 +65,35 @@ class Actor(object):
             self._generate_model()
 
         # Generate tensors to hold the gradients for our Policy Gradient update
-        self._action_gradients = tensorflow.placeholder(tensorflow.float32,
-                                                        [None, self._action_size])
+        self._action_gradients = K.placeholder(shape=[None, self._action_size])
         self._parameter_gradients = tensorflow.gradients(self._model.output,
                                                          self._model_weights,
                                                          -self._action_gradients)
         self._gradients = zip(self._parameter_gradients, self._model_weights)
 
         # Define the optimisation function
-        self._optimize = tensorflow.train.AdamOptimizer(learning_rate) \
-            .apply_gradients(self._gradients)
+        self._optimize = tensorflow.optimizers.legacy.Adam(self._learning_rate).apply_gradients(self._gradients)
+        self._adam_optimizer = K.function(inputs=[self._model.input, self._action_gradients], outputs=[K.constant(1)],
+                                          updates=[self._optimize][1:])
 
         # And initialise all tensorflow variables
-        self._tensorflow_session.run(tensorflow.initialize_all_variables())
+        tensorflow.compat.v1.global_variables_initializer()
+
+    def get_action(self, state):
+        """
+        Returns the best action predicted by the agent given the current state.
+        :param state: numpy array denoting the current state.
+        :return: numpy array denoting the predicted action.
+        """
+        return self._model.predict(state)
+
+    def get_target_actions(self, states):
+        """
+        Returns the best action predicted by the target model agent given the current state.
+        :param states: numpy array denoting the list of states to be used.
+        :return: numpy array denoting the predicted actions for each state.
+        """
+        return self._target_model.predict(states)
 
     def train(self, states, action_gradients):
         """
@@ -88,10 +104,8 @@ class Actor(object):
             network
         :return: None
         """
-        self._tensorflow_session.run(self._optimize, feed_dict={
-            self._states: states,
-            self._action_gradients: action_gradients
-        })
+        action_gradients = action_gradients[0]
+        self._adam_optimizer([states, action_gradients])
 
     def train_target_model(self):
         """
@@ -121,12 +135,32 @@ class Actor(object):
         :return: at tuple containing references to the model, weights,
             and input later
         """
-        input_layer = layers.Input(shape=[self._state_size])
-        layer = layers.Dense(self._hidden[0], activation='relu')(input_layer)
+        input_layer = layers.Input(shape=self._state_shape)
+
+        "Convolution to deal with 2D-Input"
+        conv1layer = layers.Conv2D(filters=32, kernel_size=(8, 8), strides=(4, 4), activation='relu')(input_layer)
+        conv2layer = layers.Conv2D(filters=64, kernel_size=(8, 8), strides=(4, 4), activation='relu')(conv1layer)
+        flatten = layers.Flatten()(conv2layer)
+
+        layer = layers.Dense(self._hidden[0], activation='relu')(flatten)
         layer = layers.Dense(self._hidden[1], activation='relu')(layer)
         steering = layers.Dense(1, activation='tanh')(layer)
         brake = layers.Dense(1, activation='sigmoid')(layer)
         gas = layers.Dense(1, activation='sigmoid')(layer)
         output_layer = layers.Concatenate()([steering, gas, brake])
-        model = models.Model(input=input_layer, output=output_layer)
+        model = models.Model(inputs=input_layer, outputs=output_layer)
         return model, model.trainable_weights, input_layer
+
+    def load(self):
+        """
+        Loads the neural network's weights from disk.
+        """
+        self._model.load_weights("actor.h5")
+        self._target_model.load_weights("target_actor.h5")
+
+    def save(self):
+        """
+        Saves the neural network's weights to disk.
+        """
+        self._model.save_weights("actor.h5")
+        self._target_model.save_weights("target_actor.h5")
