@@ -22,12 +22,10 @@ def gray_scale(observation):
 
 
 def preprocess_state(observation):
-    "Cropping the image"
-    cropped = observation[63:65, 24:73]
-
-    green = green_mask(cropped)
+    green = green_mask(observation)
     grey = gray_scale(green)
-    return grey
+    state = np.reshape(grey, (grey.shape[0], grey.shape[1], 1))
+    return state
 
 
 def reward_engineering(state, action, reward, next_state, done):
