@@ -3,6 +3,7 @@ from DDPG.critic import Critic
 
 from collections import deque
 import tensorflow
+import keras
 import random
 import numpy as np
 
@@ -22,10 +23,10 @@ class DDPGAgent(object):
     Represents a Deep Deterministic Policy Gradient (DDPG) agent.
     """
 
-    def __init__(self, state_shape, action_size, actor_hidden_units=(20, 40),
-                 actor_learning_rate=0.0001, critic_hidden_units=(20, 40),
-                 critic_learning_rate=0.001, gamma=0.95,
-                 buffer_size=4098, tau=0.001):
+    def __init__(self, state_shape, action_size, actor_hidden_units=(32, 64),
+                 actor_learning_rate=0.0001, critic_hidden_units=(32, 64),
+                 critic_learning_rate=0.001, gamma=0.99,
+                 buffer_size=4098, tau=0.005):
         """
         Constructs a DDPG Agent with the given parameters
 
@@ -53,19 +54,19 @@ class DDPGAgent(object):
         self._gamma = gamma
         self._buffer_size = buffer_size
 
-        tensorflow_session = _generate_tensorflow_session()
-
-        self._actor = Actor(tensorflow_session=tensorflow_session,
-                            state_shape=state_shape, action_size=action_size,
+        self._actor = Actor(state_shape=state_shape, action_size=action_size,
                             hidden_units=actor_hidden_units,
                             learning_rate=actor_learning_rate,
                             tau=tau)
 
-        self._critic = Critic(tensorflow_session=tensorflow_session,
-                              state_shape=state_shape, action_size=action_size,
+        self._actor_optimizer = keras.optimizers.Adam(actor_learning_rate)
+
+        self._critic = Critic(state_shape=state_shape, action_size=action_size,
                               hidden_units=critic_hidden_units,
                               learning_rate=critic_learning_rate,
                               tau=tau)
+
+        self._critic_optimizer = keras.optimizers.Adam(critic_learning_rate)
 
         self._memory = deque()
 
@@ -75,8 +76,9 @@ class DDPGAgent(object):
         :param state: numpy array denoting the current state.
         :return: numpy array denoting the predicted action.
         """
-        state = state[np.newaxis, ...]
-        return self._actor.get_action(state)
+        action = self._actor.policy(state)
+        action = np.squeeze(action)
+        return [action]
 
     def train(self, batch_size):
         """
@@ -97,17 +99,42 @@ class DDPGAgent(object):
 
         :return: None
         """
-        print("Training DDPG Agent")
         states, actions, rewards, done, next_states = self._get_sample(batch_size)
 
-        # Transforming into numpy array
-        states = np.array(states)
-        next_states = np.array(next_states)
-        actions = np.array(actions)
+        # Transforming into tensor
+        states = keras.ops.convert_to_tensor(np.array(states))
+        next_states = keras.ops.convert_to_tensor(np.array(next_states))
+        rewards = keras.ops.convert_to_tensor(np.array(rewards))
+        rewards = keras.ops.cast(rewards, dtype="float32")
+        actions = keras.ops.convert_to_tensor(np.array(actions))
 
-        self._train_critic(states, actions, next_states, done, rewards)
-        self._train_actor(states)
-        self._update_target_models()
+        # Training and updating Actor & Critic networks.
+        # See Pseudo Code.
+        with tensorflow.GradientTape() as tape:
+            target_actions = self._actor.get_target_actions(next_states)
+            y = rewards + self._gamma * self._critic.get_target_q(states, target_actions)
+            critic_value = self._critic.get_q(states, actions)
+            critic_loss = keras.ops.mean(keras.ops.square(y - critic_value))
+
+        critic_grad = tape.gradient(critic_loss, self._critic.get_trainable_params())
+        self._critic_optimizer.apply_gradients(
+            zip(critic_grad, self._critic.get_trainable_params())
+        )
+
+        with tensorflow.GradientTape() as tape:
+            actions_pred = self._actor.get_action(states)
+            critic_value = self._critic.get_q(states, actions_pred)
+            # Used `-value` as we want to maximize the value given
+            # by the critic for our actions
+            actor_loss = -keras.ops.mean(critic_value)
+
+        actor_grad = tape.gradient(actor_loss, self._actor.get_trainable_params())
+        self._actor_optimizer.apply_gradients(
+            zip(actor_grad, self._actor.get_trainable_params())
+        )
+
+        self._actor.train_target_model()
+        self._critic.train_target_model()
 
     def _get_sample(self, batch_size):
         """
@@ -121,75 +148,6 @@ class DDPGAgent(object):
         states, actions, rewards, done, next_states = zip(*sample)
         return states, actions, rewards, done, next_states
 
-    def _train_critic(self, states, actions, next_states, done, rewards):
-        """
-        Trains the critic network
-
-        C(s, a) -> q
-
-        :param states: List of the states to train the network with
-        :param actions: List of the actions to train the network with
-        :param next_states: List of the t+1 states to train the network with
-        :param rewards: List of rewards to calculate q_targets.
-
-        :return: None
-        """
-        q_targets = self._get_q_targets(next_states, done, rewards)
-        q_targets = np.array(q_targets)
-        self._critic.train(states, actions, q_targets)
-
-    def _get_q_targets(self, next_states, done, rewards):
-        """
-        Calculates the q targets with the following formula
-
-        q = r + gamma * next_q
-
-        unless there is no next state in which
-
-        q = r
-
-        :param next_states: List(List(Float)) Denoting the t+1 state
-        :param done: List(Bool) denoting whether each step was an exit step
-        :param rewards: List(Float) Denoting the reward given in each step
-        :return: The q targets
-        """
-        next_actions = self._actor.get_target_actions(next_states)
-        next_q_values = self._critic.get_target_q(next_states, next_actions)
-        q_targets = [reward if this_done else reward + self._gamma * next_q_value
-                     for (reward, next_q_value, this_done)
-                     in zip(rewards, next_q_values, done)]
-        return q_targets
-
-    def _train_actor(self, states):
-        """
-        Trains the actor network using the calculated deterministic policy
-            gradients.
-
-        :param states: List(List(Float)) denoting he states to train the Actor
-            on
-        :return: None
-        """
-        gradients = self._get_gradients(states)
-        self._actor.train(states, gradients)
-
-    def _get_gradients(self, states):
-        """
-        Calculates the Deterministic Policy Gradient for Actor training
-        :param states: The states to calculate the gradients for.
-        :return:
-        """
-        action_for_gradients = self._actor.get_action(states)
-        return self._critic.get_gradients(states, action_for_gradients)
-
-    def _update_target_models(self):
-        """
-        Updates the target models to slowly track the main models
-
-        :return: None
-        """
-        self._critic.train_target_model()
-        self._actor.train_target_model()
-
     def remember(self, state, action, reward, done, next_state):
         """
         Stores the given state, action, reward etc. in the Agent's memory.
@@ -201,9 +159,9 @@ class DDPGAgent(object):
         :param next_state: The next state (if applicable)
         :return: None
         """
-        self._memory.append((state, action, reward, done, next_state))
-        if len(self._memory) > self._buffer_size:
+        if len(self._memory) + 1 > self._buffer_size:
             self._memory.popleft()
+        self._memory.append((state, action, reward, done, next_state))
 
     def load(self):
         """
