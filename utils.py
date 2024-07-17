@@ -1,5 +1,10 @@
 import cv2
 import numpy as np
+import random
+
+
+def noise(x, mu, theta, sigma):
+    return theta * (mu - x) + sigma * np.random.randn(1)
 
 
 def green_mask(observation):

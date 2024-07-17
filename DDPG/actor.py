@@ -1,6 +1,7 @@
 import tensorflow
 from tensorflow.keras import models, layers, optimizers, backend, activations, losses
-import tensorflow.keras.backend as K
+import keras
+from keras import initializers
 import numpy as np
 
 
@@ -14,21 +15,18 @@ class Actor(object):
     actions a.
     """
 
-    def __init__(self, tensorflow_session, state_shape, action_size,
+    def __init__(self, state_shape, action_size,
                  hidden_units, learning_rate=0.0001,
                  tau=0.001):
         """
         Constructor for the Actor network
 
-        :param tensorflow_session: The tensorflow session.
-            See https://www.tensorflow.org for more information on tensorflow
-            sessions.
         :param state_shape: An array denoting the dimensionality of the states
             in the current problem
         :param action_size: An integer denoting the dimensionality of the
             actions in the current problem
         :param hidden_units: An iterable defining the number of hidden units in
-            each layer. Soon to be depreciated. default: (300, 600)
+            each layer. Soon to be depreciated. default: (20, 40)
         :param learning_rate: A fload denoting the speed at which the network
             will learn. default: 0.0001
         :param tau: A flot denoting the rate at which the target model will
@@ -47,15 +45,11 @@ class Actor(object):
         """
         # Store parameters
         self._states = None
-        self._tensorflow_session = tensorflow_session
         self._state_shape = state_shape
         self._action_size = action_size
         self._tau = tau
         self._learning_rate = learning_rate
         self._hidden = hidden_units
-
-        # Let tensorflow and keras work together
-        tensorflow.compat.v1.keras.backend.set_session(tensorflow_session)
 
         # Generate the main model
         self._model, self._model_weights, self._model_input = \
@@ -64,28 +58,23 @@ class Actor(object):
         self._target_model, self._target_weights, self._target_state = \
             self._generate_model()
 
-        # Generate tensors to hold the gradients for our Policy Gradient update
-        self._action_gradients = K.placeholder(shape=[None, self._action_size])
-        self._parameter_gradients = tensorflow.gradients(self._model.output,
-                                                         self._model_weights,
-                                                         -self._action_gradients)
-        self._gradients = zip(self._parameter_gradients, self._model_weights)
-
-        # Define the optimisation function
-        self._optimize = tensorflow.optimizers.legacy.Adam(self._learning_rate).apply_gradients(self._gradients)
-        self._adam_optimizer = K.function(inputs=[self._model.input, self._action_gradients], outputs=[K.constant(1)],
-                                          updates=[self._optimize][1:])
-
-        # And initialise all tensorflow variables
-        tensorflow.compat.v1.global_variables_initializer()
-
-    def get_action(self, state):
+    def policy(self, state):
         """
-        Returns the best action predicted by the agent given the current state.
-        :param state: numpy array denoting the current state.
-        :return: numpy array denoting the predicted action.
+        Returns the best action predicted by the target model agent given the current state.
+        :param state: numpy array denoting the list of states to be used.
+        :return: numpy array denoting the predicted actions for each state.
         """
-        return self._model.predict(state)
+        sampled = keras.ops.squeeze(self._model(state))
+        sampled = sampled.numpy()
+        return sampled
+
+    def get_action(self, states):
+        """
+        Returns the best action predicted by the target model agent given the current state.
+        :param states: numpy array denoting the list of states to be used.
+        :return: numpy array denoting the predicted actions for each state.
+        """
+        return self._model(states, training=True)
 
     def get_target_actions(self, states):
         """
@@ -93,7 +82,10 @@ class Actor(object):
         :param states: numpy array denoting the list of states to be used.
         :return: numpy array denoting the predicted actions for each state.
         """
-        return self._target_model.predict(states)
+        return self._target_model(states, training=True)
+
+    def get_trainable_params(self):
+        return self._model.trainable_variables
 
     def train(self, states, action_gradients):
         """
@@ -138,17 +130,25 @@ class Actor(object):
         input_layer = layers.Input(shape=self._state_shape)
 
         "Convolution to deal with 2D-Input"
-        conv1layer = layers.Conv2D(filters=32, kernel_size=(8, 8), strides=(4, 4), activation='relu')(input_layer)
-        conv2layer = layers.Conv2D(filters=64, kernel_size=(8, 8), strides=(4, 4), activation='relu')(conv1layer)
-        flatten = layers.Flatten()(conv2layer)
+        conv1layer = layers.Conv2D(filters=6, kernel_size=(7, 7), strides=3, activation='relu')(input_layer)
+        pool1 = layers.MaxPool2D(pool_size=(2, 2))(conv1layer)
+        conv2layer = layers.Conv2D(filters=12, kernel_size=(4, 4), strides=1, activation='relu')(pool1)
+        pool2 = layers.MaxPool2D(pool_size=(2, 2))(conv2layer)
+        flatten = layers.Flatten()(pool2)
 
         layer = layers.Dense(self._hidden[0], activation='relu')(flatten)
         layer = layers.Dense(self._hidden[1], activation='relu')(layer)
-        steering = layers.Dense(1, activation='tanh')(layer)
-        brake = layers.Dense(1, activation='sigmoid')(layer)
-        gas = layers.Dense(1, activation='sigmoid')(layer)
+
+        steering = layers.Dense(1, activation='tanh',
+                                kernel_initializer=initializers.RandomUniform(minval=-0.5, maxval=0.5))(layer)
+        brake = layers.Dense(1, activation='sigmoid',
+                             kernel_initializer=initializers.RandomUniform(minval=0.25, maxval=0.75))(layer)
+        gas = layers.Dense(1, activation='sigmoid',
+                           kernel_initializer=initializers.RandomUniform(minval=0.25, maxval=0.75))(layer)
         output_layer = layers.Concatenate()([steering, gas, brake])
         model = models.Model(inputs=input_layer, outputs=output_layer)
+
+        print(model.summary())
         return model, model.trainable_weights, input_layer
 
     def load(self):
