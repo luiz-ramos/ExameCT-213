@@ -1,0 +1,6 @@
+gym
+numpy
+opencv-python
+matplotlib
+tensorflow
+gym[box2d]
