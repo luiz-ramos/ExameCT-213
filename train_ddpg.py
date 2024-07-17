@@ -21,7 +21,9 @@ fig_format = 'png'  # Format used for saving matplotlib's figures
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # Exploration
-epsilon = 1
+epsilon_start = 1
+epsilon_final = 0.01
+decay_rate = NUM_EPISODES / 50
 
 # Initiating the Car Racing environment
 env = gym.make("CarRacing-v2", render_mode='human', continuous=True)
@@ -51,11 +53,9 @@ for episodes in range(1, NUM_EPISODES + 1):
 
     # Extracting state from observed state
     state = preprocess_state(ob)
-    tf_state = keras.ops.expand_dims(
-        keras.ops.convert_to_tensor(state), 0
-    )
 
     # Cumulative reward is the return since the beginning of the episode
+    exploration_noise = 0.5
     negative_reward_counter = 0
     time_frame_counter = 1
     cumulative_reward = 0.0
@@ -63,27 +63,31 @@ for episodes in range(1, NUM_EPISODES + 1):
         if RENDER:
             env.render()  # Render the environment for visualization
 
+        exploration_noise = (epsilon_start - epsilon_final) * np.exp(-1. * time_frame_counter / decay_rate)
+
         # Select action
+        tf_state = keras.ops.expand_dims(
+            keras.ops.convert_to_tensor(state), 0
+        )
         action = agent.act(tf_state)[0]
 
         # Adding noise
-        action[0] += max(epsilon, 0) * noise(action[0], 0.0, 0.60, 0.30)
-        action[1] += max(epsilon, 0) * noise(action[1], 0.5, 1.00, 0.10)
-        action[2] += max(epsilon, 0) * noise(action[2], -0.1, 1.00, 0.05)
+        noise = np.random.normal(0, exploration_noise, size=action_size)
+        action = action + noise
+        action = action.clip(env.action_space.low, env.action_space.high)
 
-        print("Action:", action)
+        if time_frame_counter % 20 == 0:
+            print("Action:", action)
 
         # Take action, observe reward and new state
         ob, reward, done, fa, info = env.step(action)
         next_state = preprocess_state(ob)
 
         # Making reward engineering to allow faster training
-        if abs(action[0]) > 0.2:
-            reward -= 0.5
-        elif action[2] > 0.1:
-            reward -= 0.5
-        elif action[1] > 0.5:
-            reward += 1
+        if action[1] > 0.5 and action[2] < 0.1:
+            reward += 1.5
+        elif abs(action[0]) > 0.4:
+            reward -= 2
 
         # Appending this experience to the experience replay buffer
         agent.remember(state, action, reward, done, next_state)
@@ -93,14 +97,13 @@ for episodes in range(1, NUM_EPISODES + 1):
         cumulative_reward = agent._gamma * cumulative_reward + reward
 
         if done or negative_reward_counter >= 25 or cumulative_reward < 0:
-            print("episode: {}/{}, score: {:.6}"
-                  .format(episodes, NUM_EPISODES, cumulative_reward))
+            print("episode: {}/{}, score: {:.6}, frame counter: {}"
+                  .format(episodes, NUM_EPISODES, cumulative_reward, time_frame_counter))
             break
 
         # Update state
         state = next_state
         time_frame_counter += 1
-        epsilon -= 1 / (100*NUM_EPISODES)
 
         # We only update the policy if we already have enough experience in memory
         loss = agent.train(batch_size)

@@ -23,10 +23,10 @@ class DDPGAgent(object):
     Represents a Deep Deterministic Policy Gradient (DDPG) agent.
     """
 
-    def __init__(self, state_shape, action_size, actor_hidden_units=(20, 40),
-                 actor_learning_rate=0.0001, critic_hidden_units=(20, 40),
-                 critic_learning_rate=0.001, gamma=0.95,
-                 buffer_size=4098, tau=0.01):
+    def __init__(self, state_shape, action_size, actor_hidden_units=(32, 64),
+                 actor_learning_rate=0.0001, critic_hidden_units=(32, 64),
+                 critic_learning_rate=0.001, gamma=0.99,
+                 buffer_size=4098, tau=0.005):
         """
         Constructs a DDPG Agent with the given parameters
 
@@ -132,10 +132,6 @@ class DDPGAgent(object):
         self._actor_optimizer.apply_gradients(
             zip(actor_grad, self._actor.get_trainable_params())
         )
-
-        print("Losses:")
-        print(critic_loss.numpy())
-        print(actor_loss.numpy())
 
         self._actor.train_target_model()
         self._critic.train_target_model()

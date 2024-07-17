@@ -140,11 +140,11 @@ class Actor(object):
         layer = layers.Dense(self._hidden[1], activation='relu')(layer)
 
         steering = layers.Dense(1, activation='tanh',
-                                kernel_initializer=initializers.RandomUniform(minval=-0.5, maxval=0.5))(layer)
-        brake = layers.Dense(1, activation='sigmoid',
-                             kernel_initializer=initializers.RandomUniform(minval=0.25, maxval=0.75))(layer)
+                                kernel_initializer=initializers.RandomUniform(minval=-0.05, maxval=0.05))(layer)
         gas = layers.Dense(1, activation='sigmoid',
-                           kernel_initializer=initializers.RandomUniform(minval=0.25, maxval=0.75))(layer)
+                           kernel_initializer=initializers.RandomUniform(minval=0.05, maxval=0.10))(layer)
+        brake = layers.Dense(1, activation='sigmoid',
+                             kernel_initializer=initializers.RandomUniform(minval=0.05, maxval=0.10))(layer)
         output_layer = layers.Concatenate()([steering, gas, brake])
         model = models.Model(inputs=input_layer, outputs=output_layer)
 
