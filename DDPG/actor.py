@@ -87,18 +87,6 @@ class Actor(object):
     def get_trainable_params(self):
         return self._model.trainable_variables
 
-    def train(self, states, action_gradients):
-        """
-        Updates the weights of the main network
-
-        :param states: The states of the input to the network
-        :param action_gradients: The gradients of the actions to update the
-            network
-        :return: None
-        """
-        action_gradients = action_gradients[0]
-        self._adam_optimizer([states, action_gradients])
-
     def train_target_model(self):
         """
         Updates the weights of the target network to slowly track the main
