@@ -5,14 +5,14 @@ from DeepQLearning.dqn_agent import DQNAgent
 from DeepQLearning.utils import test_nn as test_dqn_nn
 import gymnasium as gym
 from PPO.ppo_agent import  PPOAgent
-from PPO.utils import test_NN
+from PPO.utils import test_NN, plot_result
 
 RENDER = False
 NUM_TEST_EPISODES = 30
 fig_format = 'png'
-method = 'DQN'
+# method = 'DQN'
 # method = 'DDPG'
-# method = 'PPO'
+method = 'PPO'
 
 if __name__ == '__main__':
     # Initiating the Mountain Car environment
@@ -47,8 +47,9 @@ if __name__ == '__main__':
     elif method == 'DDPG':
         a = 1
     elif method == 'PPO':
+        plot_result('PPO/results.csv')
         agent = PPOAgent(env)
-        agent.load_model("saves/temp")
+        agent.load_model("PPO/temp")
         test_NN(agent, 1)
     
     env.close()

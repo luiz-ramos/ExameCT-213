@@ -12,8 +12,8 @@ def preprocess_state(state):
 
 def select_action(policy, state):
     old_action_mean = policy.predict(state, verbose=0)
-    noise = np.random.normal(loc=0, scale=0.05, size=old_action_mean.shape)
-    noise[0][-2] /= 4
+    noise = np.random.normal(loc=0, scale=0.1, size=old_action_mean.shape)
+    #noise[0][-2] /= 4
     noise[0][-1] /= 4
     action_mean = old_action_mean + noise
     action_mean = np.clip(action_mean, 0, 1)
@@ -33,8 +33,8 @@ def test_NN(agent, n):
             action = agent.policy.predict(state_processed, verbose=0)
             temp_action = action.ravel()
 
-            temp_action[-1] = np.clip(temp_action[-1], 0.15, 1)
-            temp_action[-2] = np.clip(temp_action[-2], 0.3, 0.7)
+            temp_action[-1] = min(temp_action[-1], 0.1)
+            temp_action[-2] += 0.15
 
             action = [0, 0, 0]
             action[0] = temp_action[1] - temp_action[0]
@@ -74,8 +74,7 @@ def append_result(total_reward):
         writer.writerow([iteration, total_reward])
 
 
-def plot_result():
-    file_path = 'results.csv'
+def plot_result(file_path='results.csv'):
 
     if not os.path.isfile(file_path):
         print("Results file not found.")
