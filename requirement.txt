@@ -1,4 +1,5 @@
 gym
+gymnasium
 numpy
 opencv-python
 matplotlib
