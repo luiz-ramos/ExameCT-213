@@ -47,9 +47,22 @@ if __name__ == '__main__':
     elif method == 'DDPG':
         a = 1
     elif method == 'PPO':
+        NUM_TEST_EPISODES = 3
         plot_result('PPO/results.csv')
         agent = PPOAgent(env)
         agent.load_model("PPO/temp")
-        test_NN(agent, 1)
+
+        result = test_NN(agent, NUM_TEST_EPISODES)
+        episodes = list(range(len(result)))
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(episodes, result, marker='o', linestyle='-', color='b')
+
+        plt.title('Test Total Reward x Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Total Reward')
+
+        plt.grid(True)
+        plt.show()
     
     env.close()
