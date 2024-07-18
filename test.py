@@ -47,11 +47,8 @@ if __name__ == '__main__':
     elif method == 'DDPG':
         a = 1
     elif method == 'PPO':
-
-        env = gym.make("CarRacing-v2", render_mode="human")
         agent = PPOAgent(env)
         agent.load_model("saves/temp")
         test_NN(agent, 1)
-        a = 2
     
     env.close()
