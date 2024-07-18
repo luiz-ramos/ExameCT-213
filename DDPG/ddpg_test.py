@@ -8,10 +8,10 @@ from DDPG.utils import preprocess, decode_model_output
 env = gym.make('CarRacing-v2', continuous=True, render_mode='human')
 
 def test_ddpg(env, num_episodes=100):
-    actor = keras.models.load_model('DDPG/best_solution/actor.weights.h5')
-    critic = keras.models.load_model('DDPG/best_solution/critic.weights.h5')
-    target_actor = keras.models.load_model('DDPG/best_solution/target_actor.weights.h5')
-    target_critic = keras.models.load_model('DDPG/best_solution/target_critic.weights.h5')
+    actor = keras.models.load_model('saves/ddpg_actor.weights.h5')
+    critic = keras.models.load_model('saves/ddpg_critic.weights.h5')
+    target_actor = keras.models.load_model('saves/ddpg_target_actor.weights.h5')
+    target_critic = keras.models.load_model('saves/ddpg_target_critic.weights.h5')
 
     reward_history = []
     avg_reward_history = []
