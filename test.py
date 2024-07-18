@@ -51,7 +51,7 @@ if __name__ == '__main__':
         NUM_TEST_EPISODES = 3
         plot_result('PPO/results.csv')
         agent = PPOAgent(env)
-        agent.load_model("saves/temp")
+        agent.load_model("saves/ppo")
 
         result = test_NN(agent, NUM_TEST_EPISODES)
         episodes = list(range(len(result)))
