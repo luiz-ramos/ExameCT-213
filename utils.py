@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from collections import deque
 import random
 
 
@@ -52,3 +53,49 @@ def reward_engineering(state, action, reward, next_state, done):
     """
 
     return reward
+
+
+def select_action(policy, state):
+    old_action_mean = policy.predict(state, verbose=0)
+    noise = np.random.normal(loc=0, scale=0.1, size=old_action_mean.shape)
+    noise[0][-2] /= 4
+    noise[0][-1] *= 3
+    action_mean = old_action_mean + noise
+    action_mean = np.clip(action_mean, 0, 1)
+
+    return action_mean, old_action_mean
+
+
+def test_NN(agent, n):
+    result = 0
+    for _ in range(n):
+        done = False
+        state, _ = agent.env.reset()
+        reward = 0
+        lastNrewards = deque(maxlen=100)
+        while not done:
+            state_processed = preprocess_state(state)
+            action = agent.policy.predict(state_processed, verbose=0)
+            temp_action = action.ravel()
+
+            temp_action[-1] = min(temp_action[-1], 0.1)
+            action = [0, 0, 0]
+            action[0] = temp_action[1] - temp_action[0]
+            action[1: 2] = temp_action[2: 3]
+
+            for _ in range(3):
+                next_state, r, terminated, truncated, _ = agent.env.step(action)
+                lastNrewards.append(r)
+                reward += r
+                done = terminated or truncated
+                if done:
+                    break
+
+            agent.env.render()
+            state = next_state
+
+            if all(a < 0 for a in lastNrewards):
+                break
+        result += reward
+    return result
+
