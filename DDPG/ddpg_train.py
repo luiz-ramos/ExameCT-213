@@ -208,9 +208,6 @@ for ep in range(total_episodes):
         action, train_action = policy(prev_state, ou_noise)
         action /= 4
 
-        if time_frame_counter % 20 == 0:
-            print(action)
-
         # Receive state and reward from environment.
         state, reward, done, truncated, _ = env.step(action)
         state = preprocess(state)
@@ -242,14 +239,16 @@ for ep in range(total_episodes):
     if ep % 20 == 0:
         save_weights()
 
-    # Mean of last 40 episodes
-    avg_reward = np.mean(ep_reward_list[-40:])
+    # Mean of last 100 episodes
+    avg_reward = np.mean(ep_reward_list[-100:])
     print("Episode * {} * Avg Reward is ==> {}".format(ep, avg_reward))
     avg_reward_list.append(avg_reward)
 
 # Plotting graph
-# Episodes versus Avg. Rewards
-plt.plot(avg_reward_list)
-plt.xlabel("Episode")
-plt.ylabel("Avg. Episodic Reward")
+fig = plt.figure()
+ax = plt.subplot(111)
+episodes = np.arange(1, total_episodes + 1)
+ax.plot(episodes, ep_reward_list, label="Rewards (Original)")
+ax.plot(episodes, avg_reward_list, label="Rewards (100 Moving Averages)")
+ax.legend()
 plt.show()
