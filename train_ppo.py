@@ -1,4 +1,4 @@
-from utils import test_NN, preprocess_state, select_action
+from PPO.utils import test_NN, preprocess_state, select_action, append_result
 from collections import deque
 
 
@@ -11,7 +11,7 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
         state, _ = agent.env.reset()
         agent.env.render()
         lastNrewards = deque(maxlen=100)
-
+        result = 0
         for t in range(max_steps):
             state_processed = preprocess_state(state)
             action_mean, old_action_mean = select_action(agent.policy, state_processed)
@@ -31,6 +31,7 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
                 done = terminated or truncated
                 if done:
                     break
+            result += reward
 
             episode_states.append(state_processed[0])
             episode_actions.append(temp_action)
@@ -47,6 +48,7 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
 
         agent.optimize_policy(episode_states, episode_actions, episode_rewards, episode_old_action_means)
         agent.save_model("temp")
+        append_result(result)
         #test_NN(agent)
 
 if __name__ == "__main__":
@@ -56,5 +58,5 @@ if __name__ == "__main__":
     env = gym.make("CarRacing-v2", render_mode="human")
     agent = PPOAgent(env)
     agent.load_model("temp")
-    test_NN(agent, 1)
+    #test_NN(agent, 1)
     train_ppo(agent)
