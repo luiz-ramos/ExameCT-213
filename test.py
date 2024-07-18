@@ -6,13 +6,14 @@ from DeepQLearning.utils import test_nn as test_dqn_nn
 import gymnasium as gym
 from PPO.ppo_agent import  PPOAgent
 from PPO.utils import test_NN, plot_result
+from DDPG.ddpg_test import test_ddpg
 
 RENDER = False
 NUM_TEST_EPISODES = 30
 fig_format = 'png'
 # method = 'DQN'
-# method = 'DDPG'
-method = 'PPO'
+method = 'DDPG'
+# method = 'PPO'
 
 if __name__ == '__main__':
     # Initiating the Mountain Car environment
@@ -45,7 +46,7 @@ if __name__ == '__main__':
             print('Total Rewards(mean): {:.2}, Cumulative Rewards(mean): {:.2}'.format(sum(total_return_history)/NUM_TEST_EPISODES, sum(cumulative_return_history)/NUM_TEST_EPISODES))
             
     elif method == 'DDPG':
-        a = 1
+        test_ddpg(env, NUM_TEST_EPISODES)
     elif method == 'PPO':
         NUM_TEST_EPISODES = 3
         plot_result('PPO/results.csv')
