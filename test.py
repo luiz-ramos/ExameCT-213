@@ -1,9 +1,11 @@
 import os
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
-import gym
 import matplotlib.pyplot as plt
 from DeepQLearning.dqn_agent import DQNAgent
 from DeepQLearning.utils import test_nn as test_dqn_nn
+import gymnasium as gym
+from PPO.ppo_agent import  PPOAgent
+from PPO.utils import test_NN
 
 RENDER = False
 NUM_TEST_EPISODES = 30
@@ -45,6 +47,11 @@ if __name__ == '__main__':
     elif method == 'DDPG':
         a = 1
     elif method == 'PPO':
+
+        env = gym.make("CarRacing-v2", render_mode="human")
+        agent = PPOAgent(env)
+        agent.load_model("PPO/temp")
+        test_NN(agent, 1)
         a = 2
     
     env.close()

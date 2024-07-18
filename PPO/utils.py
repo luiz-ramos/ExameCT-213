@@ -12,9 +12,9 @@ def preprocess_state(state):
 
 def select_action(policy, state):
     old_action_mean = policy.predict(state, verbose=0)
-    noise = np.random.normal(loc=0, scale=0.1, size=old_action_mean.shape)
+    noise = np.random.normal(loc=0, scale=0.05, size=old_action_mean.shape)
     noise[0][-2] /= 4
-    noise[0][-1] *= 3
+    noise[0][-1] /= 4
     action_mean = old_action_mean + noise
     action_mean = np.clip(action_mean, 0, 1)
 
@@ -22,7 +22,7 @@ def select_action(policy, state):
 
 
 def test_NN(agent, n):
-    result = 0
+    result = []
     for _ in range(n):
         done = False
         state, _ = agent.env.reset()
@@ -33,7 +33,9 @@ def test_NN(agent, n):
             action = agent.policy.predict(state_processed, verbose=0)
             temp_action = action.ravel()
 
-            temp_action[-1] = min(temp_action[-1], 0.1)
+            temp_action[-1] = np.clip(temp_action[-1], 0.15, 1)
+            temp_action[-2] = np.clip(temp_action[-2], 0.3, 0.7)
+
             action = [0, 0, 0]
             action[0] = temp_action[1] - temp_action[0]
             action[1: 2] = temp_action[2: 3]
@@ -51,12 +53,12 @@ def test_NN(agent, n):
 
             if all(a < 0 for a in lastNrewards):
                 break
-        result += reward
+        result.append(reward)
     return result
 
 
 def append_result(total_reward):
-    file_path = 'PPO/results.csv'
+    file_path = 'results.csv'
     # Check if file exists to determine if header is needed
     file_exists = os.path.isfile(file_path)
 
@@ -73,7 +75,7 @@ def append_result(total_reward):
 
 
 def plot_result():
-    file_path = 'PPO/results.csv'
+    file_path = 'results.csv'
 
     if not os.path.isfile(file_path):
         print("Results file not found.")

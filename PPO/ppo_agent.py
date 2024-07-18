@@ -39,12 +39,12 @@ class PPOAgent:
         return actor, critic
 
     def save_model(self, filename):
-        self.policy.save_weights(f"PPO/{filename}_actor.weights.h5")
-        self.critic.save_weights(f"PPO/{filename}_critic.weights.h5")
+        self.policy.save_weights(f"{filename}_actor.weights.h5")
+        self.critic.save_weights(f"{filename}_critic.weights.h5")
 
     def load_model(self, filename):
-        self.policy.load_weights(f"PPO/{filename}_actor.weights.h5")
-        self.critic.load_weights(f"PPO/{filename}_critic.weights.h5")
+        self.policy.load_weights(f"{filename}_actor.weights.h5")
+        self.critic.load_weights(f"{filename}_critic.weights.h5")
 
     def discount_rewards(self, rewards):
         returns = []

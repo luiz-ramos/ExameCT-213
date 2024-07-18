@@ -1,4 +1,4 @@
-from PPO.utils import test_NN, preprocess_state, select_action, append_result
+from utils import test_NN, preprocess_state, select_action, append_result
 from collections import deque
 
 
@@ -16,7 +16,8 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
             state_processed = preprocess_state(state)
             action_mean, old_action_mean = select_action(agent.policy, state_processed)
             temp_action = action_mean.ravel()
-            temp_action[-1] = min(temp_action[-1], 0.1)
+            temp_action[-1] = min(temp_action[-1], 0.15)
+            #temp_action[-2] = 1
 
             action = [0, 0, 0]
             action[0] = temp_action[1] - temp_action[0]
