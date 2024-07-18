@@ -7,6 +7,8 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
     episode_actions = []
     episode_rewards = []
     episode_old_action_means = []
+    kind = "no"
+    u = 0
     for episode in range(episodes):
         state, _ = agent.env.reset()
         agent.env.render()
@@ -14,10 +16,14 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
         result = 0
         for t in range(max_steps):
             state_processed = preprocess_state(state)
-            action_mean, old_action_mean = select_action(agent.policy, state_processed)
+            action_mean, old_action_mean, u, kind = select_action(agent.policy, state_processed, u, kind)
             temp_action = action_mean.ravel()
             temp_action[-1] = min(temp_action[-1], 0.1)
-            temp_action[-2] = max(temp_action[-2], 0.2)
+
+            if episode <= 5:
+                temp_action = old_action_mean.ravel()
+                temp_action[-1] = min(temp_action[-1], 0.1)
+                temp_action[-2] = max(temp_action[-2], 0.5)
 
             action = [0, 0, 0]
             action[0] = temp_action[1] - temp_action[0]
@@ -47,10 +53,11 @@ def train_ppo(agent, episodes=1000, max_steps=1000):
 
         print(f"Iteração {episode}\n")
 
-        agent.optimize_policy(episode_states, episode_actions, episode_rewards, episode_old_action_means)
-        agent.save_model("temp")
-        append_result(result)
-        #test_NN(agent)
+        if episode > 5:
+            agent.optimize_policy(episode_states, episode_actions, episode_rewards, episode_old_action_means)
+            agent.save_model("temp") # Comente caso não queira salvar a cada episódio
+            append_result(result)
+            #test_NN(agent)
 
 if __name__ == "__main__":
     import gymnasium as gym
@@ -58,6 +65,6 @@ if __name__ == "__main__":
 
     env = gym.make("CarRacing-v2", render_mode="human")
     agent = PPOAgent(env)
-    agent.load_model("temp")
+    agent.load_model("temp") #Comente caso não tenha modelo salvo em PPO
     #test_NN(agent, 1)
     train_ppo(agent)
