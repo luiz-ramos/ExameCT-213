@@ -39,7 +39,7 @@ def test_nn(agent, env, n, stack_frames = 3, skip_frames = 3):
         cumulative_reward = 0.0
         done = False
         
-        for time in range(1, 180):
+        for time in range(1, 270):
             curr_state_stack = process_deque(state_stack)
             action = agent.act(curr_state_stack)
 
@@ -57,7 +57,7 @@ def test_nn(agent, env, n, stack_frames = 3, skip_frames = 3):
             next_state = preprocess_state(next_state)
             state_stack.append(next_state)
 
-            if done or time == 179:
+            if done or time == 269:
                 print('Episode: {}/{}, Scores(Time Frames): {}, Total Rewards(adjusted): {:.2}, Cumulative Rewards: {:.2}'.format(episodes, n, time, float(total_reward), float(cumulative_reward)))
                 total_return_history.append(total_reward)
                 cumulative_return_history.append(cumulative_reward)
