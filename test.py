@@ -12,8 +12,8 @@ RENDER = False
 NUM_TEST_EPISODES = 30
 fig_format = 'png'
 # method = 'DQN'
-method = 'DDPG'
-# method = 'PPO'
+# method = 'DDPG'
+method = 'PPO'
 
 if __name__ == '__main__':
     # Initiating the Mountain Car environment

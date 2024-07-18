@@ -92,9 +92,3 @@ class PPOAgent:
 
             # Train the critic model
             self.critic.train_on_batch(states, discounted_rewards)
-
-
-if __name__ == "__main__":
-    agent = PPOAgent("CarRacing-v2")
-    agent.train(episodes=1000)
-    agent.save_model("ppo_model_tf")
