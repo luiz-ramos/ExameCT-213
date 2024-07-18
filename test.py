@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
         env = gym.make("CarRacing-v2", render_mode="human")
         agent = PPOAgent(env)
-        agent.load_model("PPO/temp")
+        agent.load_model("saves/temp")
         test_NN(agent, 1)
         a = 2
     
